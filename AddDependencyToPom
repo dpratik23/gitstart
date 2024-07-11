@@ -1,0 +1,76 @@
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.File;
+
+public class AddDependencyToPom {
+    public static void main(String[] args) {
+        try {
+            // Path to your pom.xml file
+            String filePath = "path/to/your/pom.xml";
+
+            // Create DocumentBuilder
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new File(filePath));
+
+            // Normalize the XML structure
+            doc.getDocumentElement().normalize();
+
+            // Find the <dependencies> element
+            NodeList dependenciesList = doc.getElementsByTagName("dependencies");
+            Node dependenciesNode = null;
+
+            if (dependenciesList.getLength() == 0) {
+                // If <dependencies> does not exist, create it
+                dependenciesNode = doc.createElement("dependencies");
+                doc.getDocumentElement().appendChild(dependenciesNode);
+            } else {
+                dependenciesNode = dependenciesList.item(0);
+            }
+
+            // Create new <dependency> element
+            Element dependency = doc.createElement("dependency");
+
+            // Add <groupId> element
+            Element groupId = doc.createElement("groupId");
+            groupId.appendChild(doc.createTextNode("com.example"));
+            dependency.appendChild(groupId);
+
+            // Add <artifactId> element
+            Element artifactId = doc.createElement("artifactId");
+            artifactId.appendChild(doc.createTextNode("example-artifact"));
+            dependency.appendChild(artifactId);
+
+            // Add <version> element
+            Element version = doc.createElement("version");
+            version.appendChild(doc.createTextNode("1.0.0"));
+            dependency.appendChild(version);
+
+            // Append the new <dependency> to <dependencies>
+            dependenciesNode.appendChild(dependency);
+
+            // Write the updated document to the file
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            DOMSource source = new DOMSource(doc);
+            StreamResult result = new StreamResult(new File(filePath));
+            transformer.transform(source, result);
+
+            System.out.println("Dependency added successfully!");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
