@@ -1,27 +1,58 @@
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+
+import java.sql.Clob;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 @Repository
 public class AuditRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
-    public AuditRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    @Autowired
+    public AuditRepository(NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        this.namedParameterJdbcTemplate = namedParameterJdbcTemplate;
     }
 
     public AuditRecord findMessagesByServiceName(String serviceName) {
-        String sql = "SELECT input_message, output_message FROM audit_table WHERE service_name = ?";
-        return jdbcTemplate.queryForObject(sql, new Object[]{serviceName}, this::mapRowToAuditRecord);
+        String sql = "SELECT service_name, input_message, output_message FROM audit_table " +
+                     "WHERE service_name = :serviceName FETCH FIRST 1 ROWS ONLY";
+        SqlParameterSource namedParameters = new MapSqlParameterSource("serviceName", serviceName);
+        return namedParameterJdbcTemplate.queryForObject(sql, namedParameters, new AuditRowMapper());
     }
 
-    private AuditRecord mapRowToAuditRecord(ResultSet rs, int rowNum) throws SQLException {
-        AuditRecord record = new AuditRecord();
-        record.setServiceName(rs.getString("service_name"));
-        record.setInputMessage(rs.getString("input_message"));
-        record.setOutputMessage(rs.getString("output_message"));
-        return record;
+    private static class AuditRowMapper implements RowMapper<AuditRecord> {
+        @Override
+        public AuditRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
+            AuditRecord record = new AuditRecord();
+            record.setServiceName(rs.getString("service_name"));
+            
+            Clob inputClob = rs.getClob("input_message");
+            Clob outputClob = rs.getClob("output_message");
+            
+            record.setInputMessage(clobToString(inputClob));
+            record.setOutputMessage(clobToString(outputClob));
+            
+            return record;
+        }
+
+        private String clobToString(Clob clob) throws SQLException {
+            StringBuilder sb = new StringBuilder();
+            try (Reader reader = clob.getCharacterStream()) {
+                char[] buffer = new char[2048];
+                int bytesRead;
+                while ((bytesRead = reader.read(buffer, 0, buffer.length)) != -1) {
+                    sb.append(buffer, 0, bytesRead);
+                }
+            } catch (IOException e) {
+                throw new SQLException("Failed to read CLOB data", e);
+            }
+            return sb.toString();
+        }
     }
 }
