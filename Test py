@@ -6,6 +6,6 @@ $files = Get-ChildItem -Filter "*.zip.ARCH"
 
 # Rename each file
 foreach ($file in $files) {
-    $newName = [System.IO.Path]::ChangeExtension($file.FullName, ".zip")
+    $newName = $file.Name -replace '\.zip\.ARCH$', '.zip'
     Rename-Item -Path $file.FullName -NewName $newName
 }
